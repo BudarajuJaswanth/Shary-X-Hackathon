@@ -1,0 +1,200 @@
+import type { VoiceState } from '../types/civic';
+
+export type VoiceConnectionStatus = VoiceState;
+
+export type SupportedIntentName =
+  | 'POTHOLE_COMPLAINT'
+  | 'GARBAGE_COMPLAINT'
+  | 'STREETLIGHT_COMPLAINT'
+  | 'WATER_LEAKAGE_COMPLAINT'
+  | 'ROAD_DAMAGE_COMPLAINT'
+  | 'MOBILITY_ROUTE'
+  | 'MOBILITY_BUS_STATUS'
+  | 'MOBILITY_STOP_SEARCH'
+  | 'EMERGENCY_HOSPITAL'
+  | 'EMERGENCY_POLICE'
+  | 'EMERGENCY_FIRE'
+  | 'TRACK_REQUEST'
+  | 'GENERAL_CITY_INFORMATION'
+  | 'AFFIRMATIVE_CONFIRM'
+  | 'NEGATIVE_CANCEL'
+  | 'UNKNOWN';
+
+export interface ExtractedEntities {
+  location?: string;
+  landmark?: string;
+  destination?: string;
+  source?: string;
+  complaintType?: string;
+  description?: string;
+  urgency?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  requestId?: string;
+  routeNumber?: string;
+}
+
+export interface IntentObject {
+  intent: SupportedIntentName;
+  confidence: number;
+  entities: ExtractedEntities;
+  missingInformation: string[];
+  requiredConfirmation: boolean;
+  suggestedWorkflow: string;
+  clarificationQuestion?: string;
+  rawInput: string;
+}
+
+export interface ConversationContext {
+  sessionId: string;
+  citizenId?: string;
+  activeLanguage: 'en-IN' | 'ta-IN' | 'te-IN';
+  pendingIntent?: IntentObject;
+  accumulatedEntities: ExtractedEntities;
+  turns: ConversationTurn[];
+  lastUpdated: string;
+}
+
+export interface ConversationTurn {
+  id: string;
+  timestamp: string;
+  userInput: string;
+  systemResponse: string;
+  detectedIntent: SupportedIntentName;
+  entities: ExtractedEntities;
+}
+
+export interface Citizen {
+  id: string;
+  phoneNumber?: string;
+  name?: string;
+  preferredLanguage: 'en-IN' | 'ta-IN' | 'te-IN';
+  locationPermissionGranted: boolean;
+  lastKnownLocation?: Location;
+}
+
+export interface Location {
+  address: string;
+  landmark?: string;
+  latitude?: number;
+  longitude?: number;
+  cityArea?: string;
+}
+
+export interface Conversation {
+  id: string;
+  citizenId: string;
+  startedAt: string;
+  updatedAt: string;
+  activeLanguage: 'en-IN' | 'ta-IN' | 'te-IN';
+  messages: Message[];
+  activeWorkflowId?: string;
+  voiceSessionId?: string;
+  context?: ConversationContext;
+}
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  sender: 'CITIZEN' | 'CITYVOICE_AI' | 'SYSTEM';
+  content: string;
+  timestamp: string;
+  intent?: IntentObject;
+  toolCalls?: ToolExecution[];
+  audioUrl?: string;
+  isSpoken: boolean;
+}
+
+export type ComplaintStatus = 'REGISTERED' | 'ASSIGNED' | 'IN_PROGRESS' | 'RESOLVED' | 'REJECTED';
+
+export type ComplaintCategory = 'POTHOLE' | 'GARBAGE' | 'STREETLIGHT' | 'WATER_LEAKAGE' | 'ROAD_DAMAGE' | 'OTHER';
+
+export interface Complaint {
+  id: string;
+  ticketId: string;
+  category: ComplaintCategory;
+  title: string;
+  description: string;
+  location: Location;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  status: ComplaintStatus;
+  createdAt: string;
+  updatedAt: string;
+  estimatedResolutionHours: number;
+  assignedDepartment: string;
+  photoUrl?: string;
+  audioNoteUrl?: string;
+}
+
+export interface MobilityRequest {
+  id: string;
+  origin?: string;
+  destination: string;
+  busRouteNumber?: string;
+  requestedAt: string;
+}
+
+export interface EmergencyRequest {
+  id: string;
+  category: 'POLICE' | 'AMBULANCE' | 'FIRE' | 'DISASTER' | 'WOMEN_HELPLINE';
+  location: Location;
+  description?: string;
+  severity: 'HIGH' | 'CRITICAL';
+  requestedAt: string;
+}
+
+export type CivicRequestType = 'COMPLAINT' | 'MOBILITY' | 'EMERGENCY' | 'TRACKING';
+
+export interface CivicRequest {
+  id: string;
+  type: CivicRequestType;
+  citizenId: string;
+  complaint?: Complaint;
+  mobility?: MobilityRequest;
+  emergency?: EmergencyRequest;
+  createdAt: string;
+}
+
+export interface CityService {
+  id: string;
+  name: string;
+  department: string;
+  isAvailable: boolean;
+  contactNumber: string;
+  serviceCategory: string;
+}
+
+export type WorkflowStage = 'UNDERSTAND' | 'VERIFY' | 'EXECUTE' | 'CONFIRM' | 'COMPLETED' | 'CANCELLED';
+
+export interface Workflow {
+  id: string;
+  name: string;
+  stage: WorkflowStage;
+  extractedParameters: Record<string, any>;
+  missingParameters: string[];
+  requiredTools: string[];
+  startedAt: string;
+}
+
+export interface ToolExecution {
+  toolName: string;
+  parameters: Record<string, any>;
+  result?: any;
+  error?: string;
+  executedAt: string;
+}
+
+export interface Tool {
+  name: string;
+  description: string;
+  parametersSchema: Record<string, any>;
+  execute(params: Record<string, any>): Promise<any>;
+}
+
+export interface VoiceSession {
+  id: string;
+  status: VoiceState;
+  startedAt: string;
+  language: 'en-IN' | 'ta-IN' | 'te-IN';
+  transcriptBuffer: string;
+  isAudioStreaming: boolean;
+  errorMessage?: string;
+}
