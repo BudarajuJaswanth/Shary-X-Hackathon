@@ -92,12 +92,18 @@ export class SupabaseCivicRepository implements ICivicRepository {
 
   public async getComplaintByTicketId(ticketId: string): Promise<CivicComplaint | null> {
     const cleanSearch = ticketId.trim().toUpperCase();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ticketId.trim());
+
     try {
-      const { data, error } = await this.client
-        .from('complaints')
-        .select('*')
-        .or(`request_id.ilike.${cleanSearch},id.eq.${ticketId}`)
-        .maybeSingle();
+      let query = this.client.from('complaints').select('*');
+      
+      if (isUuid) {
+        query = query.eq('id', ticketId.trim());
+      } else {
+        query = query.ilike('request_id', cleanSearch);
+      }
+
+      const { data, error } = await query.maybeSingle();
 
       if (error) {
         console.error('[Supabase Repository Error] getComplaintByTicketId:', error);
