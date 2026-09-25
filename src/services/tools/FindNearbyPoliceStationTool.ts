@@ -3,13 +3,13 @@ import type { IEmergencyService } from '../emergency/IEmergencyService';
 import type { EmergencyFacility } from '../../domain/models';
 import { type Result, successResult } from '../../lib/error';
 
-export interface FindNearbyHospitalParams {
+export interface FindNearbyPoliceStationParams {
   location?: string;
 }
 
-export class FindNearbyHospitalTool implements ITool<FindNearbyHospitalParams, EmergencyFacility[]> {
-  public name = 'findNearbyHospital';
-  public description = 'Locates nearest emergency hospitals, trauma centers, and medical dispatch units.';
+export class FindNearbyPoliceStationTool implements ITool<FindNearbyPoliceStationParams, EmergencyFacility[]> {
+  public name = 'findNearbyPoliceStation';
+  public description = 'Locates nearest police stations, law enforcement control rooms, and patrol units.';
   public category: ToolCategory = 'EMERGENCY';
   public permission: ToolPermission = 'READ_ONLY';
   public requiresConfirmation = false;
@@ -24,12 +24,12 @@ export class FindNearbyHospitalTool implements ITool<FindNearbyHospitalParams, E
     this.emergencyService = emergencyService;
   }
 
-  public validate(_params: FindNearbyHospitalParams): ToolValidationResult {
+  public validate(_params: FindNearbyPoliceStationParams): ToolValidationResult {
     return { isValid: true, missingParameters: [] };
   }
 
-  public async execute(params: FindNearbyHospitalParams): Promise<Result<EmergencyFacility[]>> {
-    const facilities = await this.emergencyService.findNearbyFacilities('HOSPITAL', params?.location);
+  public async execute(params: FindNearbyPoliceStationParams): Promise<Result<EmergencyFacility[]>> {
+    const facilities = await this.emergencyService.findNearbyFacilities('POLICE', params?.location);
     return successResult(facilities);
   }
 }

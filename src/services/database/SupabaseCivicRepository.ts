@@ -1,5 +1,6 @@
 import type { ICivicRepository } from './ICivicRepository';
 import type { CivicComplaint, TicketStatus, ConversationMessage } from '../../types/civic';
+import type { RequestStatusHistory } from '../../domain/models';
 import { getSupabaseClient } from './supabaseClient';
 
 export class SupabaseCivicRepository implements ICivicRepository {
@@ -175,6 +176,52 @@ export class SupabaseCivicRepository implements ICivicRepository {
     } catch (err) {
       console.error('[Supabase Repository Exception] updateComplaintStatus:', err);
       return null;
+    }
+  }
+
+  public async getRequestStatusHistory(ticketId: string): Promise<RequestStatusHistory[]> {
+    try {
+      const cleanSearch = ticketId.trim().toUpperCase();
+      const { data, error } = await this.client
+        .from('request_status_history')
+        .select('*')
+        .eq('request_id', cleanSearch)
+        .order('created_at', { ascending: true });
+
+      if (error || !data || data.length === 0) {
+        // Fallback to synthesizing history from complaint record
+        const complaint = await this.getComplaintByTicketId(ticketId);
+        if (!complaint) return [];
+        return [
+          {
+            id: `hist_${complaint.ticketId}_1`,
+            requestId: complaint.ticketId,
+            status: 'REGISTERED',
+            timestamp: complaint.createdAt,
+            note: 'Complaint registered into municipal database.',
+            updatedByDepartment: complaint.assignedDepartment
+          },
+          {
+            id: `hist_${complaint.ticketId}_2`,
+            requestId: complaint.ticketId,
+            status: complaint.status,
+            timestamp: complaint.updatedAt,
+            note: `Status updated to ${complaint.status.replace('_', ' ')}.`,
+            updatedByDepartment: complaint.assignedDepartment
+          }
+        ];
+      }
+
+      return data.map((row: any) => ({
+        id: row.id,
+        requestId: row.request_id,
+        status: row.status,
+        timestamp: row.created_at || row.timestamp,
+        note: row.note,
+        updatedByDepartment: row.updated_by_department || row.department
+      }));
+    } catch {
+      return [];
     }
   }
 

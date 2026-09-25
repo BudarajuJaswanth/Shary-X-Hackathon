@@ -21,7 +21,7 @@ export type ComplaintCategory = 'POTHOLE' | 'GARBAGE' | 'STREETLIGHT' | 'WATER_L
 
 export type ComplaintPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
-export type TicketStatus = 'REGISTERED' | 'ASSIGNED' | 'IN_PROGRESS' | 'RESOLVED' | 'REJECTED';
+export type TicketStatus = 'SUBMITTED' | 'REGISTERED' | 'ASSIGNED' | 'IN_PROGRESS' | 'RESOLVED' | 'REJECTED' | 'CLOSED';
 
 export type MicPermissionStatus = 'PROMPT' | 'GRANTED' | 'DENIED' | 'UNSUPPORTED';
 
@@ -92,6 +92,8 @@ export interface AIIntentResult {
   displayMarkdown: string;
 }
 
+import type { Route, TransitStop, TransitVehicle, EmergencyFacility } from '../domain/models';
+
 export interface ConversationMessage {
   id: string;
   sender: 'CITIZEN' | 'CITYVOICE_AI';
@@ -102,5 +104,9 @@ export interface ConversationMessage {
   intentResult?: AIIntentResult;
   ticketData?: CivicComplaint;
   mobilityData?: MobilityRoute[];
+  mobilityRouteData?: Route[];
+  mobilityStopsData?: TransitStop[];
+  mobilityVehicleData?: TransitVehicle[];
   emergencyData?: EmergencyContact[];
+  emergencyFacilityData?: EmergencyFacility[];
 }

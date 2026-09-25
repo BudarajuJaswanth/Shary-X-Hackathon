@@ -2,11 +2,12 @@ import React from 'react';
 import { useCivicContext } from '../context/CivicContext';
 import { TRANSLATIONS } from '../services/translations';
 import type { LanguageCode } from '../types/civic';
-import { Mic, ShieldCheck, Globe, Cpu, LayoutDashboard, MessageSquareText, Heart, User } from 'lucide-react';
+import type { ActiveTabType } from './shell/AppShell';
+import { Mic, ShieldCheck, Globe, Cpu, LayoutDashboard, MessageSquareText, Heart, User, Sparkles } from 'lucide-react';
 
 interface HeaderProps {
-  activeTab: 'CONVERSATION' | 'TRACKER' | 'ADMIN' | 'OUR_STORY' | 'LOGIN';
-  setActiveTab: (tab: 'CONVERSATION' | 'TRACKER' | 'ADMIN' | 'OUR_STORY' | 'LOGIN') => void;
+  activeTab: ActiveTabType;
+  setActiveTab: (tab: ActiveTabType) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
@@ -15,7 +16,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
 
   return (
     <header className="civic-header">
-      <div className="header-brand" onClick={() => setActiveTab('CONVERSATION')}>
+      <div className="header-brand" onClick={() => setActiveTab('MAIN')}>
         <div className="brand-logo-icon">
           <Mic className="logo-mic" />
           <span className="logo-pulse-ring"></span>
@@ -60,11 +61,19 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
         {/* Navigation Tabs */}
         <nav className="header-nav">
           <button
+            className={`nav-btn ${activeTab === 'MAIN' ? 'active' : ''}`}
+            onClick={() => setActiveTab('MAIN')}
+          >
+            <Sparkles size={16} />
+            <span>{t.home}</span>
+          </button>
+
+          <button
             className={`nav-btn ${activeTab === 'CONVERSATION' ? 'active' : ''}`}
             onClick={() => setActiveTab('CONVERSATION')}
           >
             <MessageSquareText size={16} />
-            <span>Voice Assistant</span>
+            <span>{t.voiceInteraction}</span>
           </button>
 
           <button
@@ -72,7 +81,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
             onClick={() => setActiveTab('TRACKER')}
           >
             <ShieldCheck size={16} />
-            <span>Track Requests</span>
+            <span>{t.myRequests}</span>
           </button>
 
           <button

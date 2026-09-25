@@ -82,42 +82,42 @@ export const CitizenHomeExperience: React.FC<CitizenHomeExperienceProps> = ({ on
         return (
           <div className="voice-state-banner state-listening" role="status">
             <Radio size={16} className="pulse-icon" />
-            <span>[LISTENING] Listening to speech... Speak naturally</span>
+            <span>Listening... Speak your request naturally</span>
           </div>
         );
       case 'TRANSCRIBING':
         return (
           <div className="voice-state-banner state-processing" role="status">
             <Loader2 size={16} className="spin-icon" />
-            <span>[TRANSCRIBING] Converting speech audio to text transcript...</span>
+            <span>Converting speech audio to text...</span>
           </div>
         );
       case 'UNDERSTANDING':
         return (
           <div className="voice-state-banner state-processing" role="status">
             <Loader2 size={16} className="spin-icon" />
-            <span>[UNDERSTANDING] Analyzing intent & extracting civic parameters...</span>
+            <span>Understanding your civic request...</span>
           </div>
         );
       case 'CONFIRMING':
         return (
           <div className="voice-state-banner state-confirming" role="status">
             <FileCheck size={16} />
-            <span>[CONFIRMING] Verification drawer active. Please review details</span>
+            <span>Verification required — Please review your details below</span>
           </div>
         );
       case 'EXECUTING':
         return (
           <div className="voice-state-banner state-processing" role="status">
             <Loader2 size={16} className="spin-icon" />
-            <span>[EXECUTING] Submitting municipal ticket to civic backend...</span>
+            <span>Submitting municipal ticket to city backend...</span>
           </div>
         );
       case 'SUCCESS':
         return (
           <div className="voice-state-banner state-speaking" role="status">
             <CheckCircle2 size={16} />
-            <span>[SUCCESS] Civic action completed successfully!</span>
+            <span>Request processed successfully!</span>
           </div>
         );
       case 'SPEAKING':
@@ -129,14 +129,14 @@ export const CitizenHomeExperience: React.FC<CitizenHomeExperienceProps> = ({ on
             onClick={stopSpeaking}
           >
             <Volume2 size={16} className="bounce-icon" />
-            <span>[SPEAKING] CityVoice AI is speaking response... (Tap to pause)</span>
+            <span>Reading response... (Tap to pause audio)</span>
           </div>
         );
       case 'ERROR':
         return (
           <div className="voice-state-banner state-error" role="status">
             <XCircle size={16} />
-            <span>[ERROR] Microphone access or voice input issue. Use text fallback below</span>
+            <span>Microphone input issue — You can type your request below</span>
           </div>
         );
       case 'IDLE':
@@ -144,7 +144,7 @@ export const CitizenHomeExperience: React.FC<CitizenHomeExperienceProps> = ({ on
         return (
           <div className="voice-state-banner state-idle" role="status">
             <Sparkles size={16} />
-            <span>[IDLE] Tap the microphone button to start conversation</span>
+            <span>Tap the microphone to speak to CityVoice AI</span>
           </div>
         );
     }
@@ -253,34 +253,37 @@ export const CitizenHomeExperience: React.FC<CitizenHomeExperienceProps> = ({ on
           <div className="example-prompts-row">
             <span className="example-label">Or try asking:</span>
             <div className="prompts-chips-wrapper">
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 className="example-chip"
                 onClick={() => handleQuickPromptClick('Report a pothole near Anna Nagar bus stand')}
               >
-                🕳️ "Report a pothole"
-              </button>
-              <button
-                type="button"
+                🕳️ Report a pothole
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 className="example-chip"
                 onClick={() => handleQuickPromptClick('Where is my bus to Central Station?')}
               >
-                🚌 "Where is my bus?"
-              </button>
-              <button
-                type="button"
+                🚌 Where is my bus?
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 className="example-chip"
                 onClick={() => handleQuickPromptClick('Find a nearby hospital emergency')}
               >
-                🚑 "Find a nearby hospital"
-              </button>
+                🚑 Find a nearby hospital
+              </Button>
             </div>
           </div>
 
           <form onSubmit={handleTextSubmit} className="hero-text-fallback-form">
             <input
               type="text"
-              className="hero-text-input"
+              className="hero-text-input" id="fallback-input" aria-label="Request input"
               placeholder={
                 language === 'ta'
                   ? 'அல்லது உங்கள் செய்தியை இங்கு தட்டச்சு செய்யவும்...'
@@ -311,7 +314,7 @@ export const CitizenHomeExperience: React.FC<CitizenHomeExperienceProps> = ({ on
             className="action-card card-problem"
             onClick={() => handleQuickPromptClick('Report a problem with garbage or pothole')}
           >
-            <div className="card-icon-box bg-rose">
+            <div className="card-icon-box bg-primary">
               <AlertTriangle size={24} />
             </div>
             <h4>Report a Problem</h4>
@@ -326,7 +329,7 @@ export const CitizenHomeExperience: React.FC<CitizenHomeExperienceProps> = ({ on
             className="action-card card-track"
             onClick={() => onNavigateTab && onNavigateTab('TRACKER')}
           >
-            <div className="card-icon-box bg-cyan">
+            <div className="card-icon-box bg-secondary">
               <ShieldCheck size={24} />
             </div>
             <h4>Track Request</h4>
@@ -341,7 +344,7 @@ export const CitizenHomeExperience: React.FC<CitizenHomeExperienceProps> = ({ on
             className="action-card card-transport"
             onClick={() => handleQuickPromptClick('When is the next bus to Central Station?')}
           >
-            <div className="card-icon-box bg-blue">
+            <div className="card-icon-box bg-info">
               <Bus size={24} />
             </div>
             <h4>Find Transport</h4>
@@ -356,7 +359,7 @@ export const CitizenHomeExperience: React.FC<CitizenHomeExperienceProps> = ({ on
             className="action-card card-emergency"
             onClick={() => handleQuickPromptClick('Emergency medical assistance 108 ambulance')}
           >
-            <div className="card-icon-box bg-emerald">
+            <div className="card-icon-box bg-success">
               <CheckCircle2 size={24} />
             </div>
             <h4>Emergency Help</h4>

@@ -29,8 +29,10 @@ export class MockVoiceProvider implements IVoiceProvider {
     this.timer = setTimeout(() => {
       if (this.currentState === 'LISTENING') {
         this.updateState('TRANSCRIBING');
+        const sampleText = "There is a pothole near my college. Please report it.";
+        this.options?.onResult(sampleText, true);
       }
-    }, 2500);
+    }, 2000);
   }
 
   public async stopListening(): Promise<void> {

@@ -11,7 +11,7 @@ import type {
   EmergencyContact,
   WorkflowStage
 } from '../types/civic';
-import type { ConversationContext } from '../domain/models';
+import type { ConversationContext, RequestStatusHistory } from '../domain/models';
 import type { IVoiceProvider } from '../services/providers/IVoiceProvider';
 import { WebSpeechVoiceProvider } from '../services/providers/WebSpeechVoiceProvider';
 import { MockVoiceProvider } from '../services/providers/MockVoiceProvider';
@@ -24,8 +24,27 @@ import { isSupabaseConfigured } from '../services/database/supabaseClient';
 import { CivicAIEngine } from '../services/ai/CivicAIEngine';
 import { runIntentEngineTestSuite } from '../services/ai/CivicAIEngine.test';
 import { TRANSLATIONS } from '../services/translations';
+import {
+  formatLocalizedComplaintResponse,
+  formatLocalizedComplaintCreatedResponse,
+  formatLocalizedMobilityRouteResponse,
+  formatLocalizedNearbyStopResponse,
+  formatLocalizedBusStatusResponse,
+  formatLocalizedEmergencyResponse,
+  formatLocalizedTrackResultResponse,
+  formatLocalizedDefaultHelpResponse
+} from '../services/ai/ResponseLocalizer';
+import type { IMobilityService } from '../services/mobility/IMobilityService';
+import { MockMobilityService } from '../services/mobility/MockMobilityService';
+import type { IEmergencyService } from '../services/emergency/IEmergencyService';
+import { MockEmergencyService } from '../services/emergency/MockEmergencyService';
+import type { Route, EmergencyFacility } from '../domain/models';
+import { ToolRegistry } from '../services/tools/ToolRegistry';
+import { WorkflowOrchestrator } from '../services/workflow/WorkflowOrchestrator';
 
 interface CivicContextType {
+  toolRegistry: ToolRegistry;
+  workflowOrchestrator: WorkflowOrchestrator;
   language: LanguageCode;
   fullLanguage: Language;
   setLanguage: (lang: LanguageCode) => void;
@@ -49,6 +68,7 @@ interface CivicContextType {
     complaintData: Omit<CivicComplaint, 'id' | 'ticketId' | 'createdAt' | 'updatedAt' | 'status'>
   ) => Promise<CivicComplaint>;
   updateComplaintStatus: (ticketId: string, status: TicketStatus, note?: string) => Promise<CivicComplaint | null>;
+  getRequestStatusHistory: (ticketId: string) => Promise<RequestStatusHistory[]>;
 
   complaints: CivicComplaint[];
   refreshComplaints: () => Promise<void>;
@@ -59,6 +79,10 @@ interface CivicContextType {
   speakText: (text: string) => void;
   stopSpeaking: () => void;
   conversationContext: ConversationContext | null;
+
+  isContinuousVoiceMode: boolean;
+  setIsContinuousVoiceMode: (val: boolean) => void;
+  toggleContinuousVoiceMode: () => void;
 }
 
 const CivicContext = createContext<CivicContextType | undefined>(undefined);
@@ -85,7 +109,7 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const [complaints, setComplaints] = useState<CivicComplaint[]>([]);
   const [activeMobility, setActiveMobility] = useState<MobilityRoute[] | null>(null);
-  const [activeEmergency, setActiveEmergency] = useState<EmergencyContact[] | null>(null);
+  const [activeEmergency, _setActiveEmergency] = useState<EmergencyContact[] | null>(null);
 
   const mockCityService = useRef<ICityServiceProvider>(new MockCityServiceProvider());
   const supabaseCityService = useRef<ICityServiceProvider>(new SupabaseCityServiceProvider());
@@ -103,6 +127,15 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const activeVoiceProvider = useRef<IVoiceProvider>(webVoiceProvider.current);
   const aiEngine = useRef(new CivicAIEngine());
+  const mobilityServiceRef = useRef<IMobilityService>(new MockMobilityService());
+  const emergencyServiceRef = useRef<IEmergencyService>(new MockEmergencyService());
+
+  const toolRegistryRef = useRef<ToolRegistry>(
+    new ToolRegistry(cityServiceRef.current, mobilityServiceRef.current, emergencyServiceRef.current)
+  );
+  const workflowOrchestratorRef = useRef<WorkflowOrchestrator>(
+    new WorkflowOrchestrator(toolRegistryRef.current)
+  );
 
   useEffect(() => {
     refreshComplaints();
@@ -139,6 +172,33 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           : mockVoiceProvider.current;
     }
   };
+
+  const [isContinuousVoiceMode, setIsContinuousVoiceMode] = useState<boolean>(true);
+  const isContinuousVoiceModeRef = useRef<boolean>(true);
+
+  const toggleContinuousVoiceMode = () => {
+    setIsContinuousVoiceMode((prev) => {
+      const next = !prev;
+      isContinuousVoiceModeRef.current = next;
+      return next;
+    });
+  };
+
+  const prevVoiceStateRef = useRef<VoiceState>('IDLE');
+
+  useEffect(() => {
+    const prevState = prevVoiceStateRef.current;
+    prevVoiceStateRef.current = voiceState;
+
+    if (prevState === 'SPEAKING' && voiceState === 'IDLE' && isContinuousVoiceModeRef.current) {
+      const timer = setTimeout(() => {
+        if (activeVoiceProvider.current) {
+          activeVoiceProvider.current.startListening();
+        }
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [voiceState]);
 
   const initVoiceProvider = async (type: ProviderType, langCode: LanguageCode) => {
     const provider = getProviderInstance(type);
@@ -244,7 +304,7 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       });
       setIsVerificationOpen(true);
 
-      const responseText = `Extracted ${cat} complaint near ${loc}. Please review the verification card before we register your ticket.`;
+      const responseText = formatLocalizedComplaintResponse(cat, loc, language);
 
       const aiResponseMsg: ConversationMessage = {
         id: uniqueId('msg_ai'),
@@ -257,12 +317,55 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       setMessages((prev) => [...prev, aiResponseMsg]);
       speakText(responseText);
-    } else if (intentResult.intent.startsWith('MOBILITY')) {
-      const destination = intentResult.entities.destination || 'Central Station';
-      const routes = await cityServiceRef.current.queryMobilityRoutes(destination);
-      setActiveMobility(routes);
+    } else if (intentResult.intent === 'MOBILITY_ROUTE') {
+      const origin = intentResult.entities.origin || 'Ambattur';
+      const destination = intentResult.entities.destination || 'Chennai Central';
 
-      const responseText = `Found live bus schedules heading towards ${destination}. Next bus arrives shortly.`;
+      const routes = await mobilityServiceRef.current.getRoutes(origin, destination);
+      const mainRoute = routes[0];
+      const optionCount = mainRoute ? mainRoute.options.length : 0;
+
+      const updatedCtx: ConversationContext = {
+        ...updatedContext,
+        accumulatedEntities: {
+          ...updatedContext.accumulatedEntities,
+          origin,
+          destination,
+          lastMobilityRoutes: routes
+        }
+      };
+      setConversationContext(updatedCtx);
+
+      const legacyRoutes: MobilityRoute[] = mainRoute
+        ? mainRoute.options.map((opt) => ({
+            routeNumber: opt.routeNumber,
+            origin: opt.origin,
+            destination: opt.destination,
+            estimatedDurationMinutes: opt.durationMinutes,
+            nextDepartureTime: opt.nextDeparture,
+            etaMinutes: opt.eta.minutes,
+            fare: opt.fare,
+            busType: opt.busType as any,
+            stops: opt.stops,
+            liveStatus: opt.vehicle?.status === 'DELAYED' ? 'DELAYED' : opt.vehicle?.status === 'APPROACHING' ? 'APPROACHING' : 'ON_TIME',
+            vehicleLocation: opt.vehicle
+              ? {
+                  lat: 13.0827,
+                  lng: 80.2707,
+                  currentStop: opt.vehicle.currentStop || 'En route'
+                }
+              : undefined
+          }))
+        : [];
+      setActiveMobility(legacyRoutes);
+
+      const responseText = formatLocalizedMobilityRouteResponse(
+        origin,
+        destination,
+        optionCount,
+        mainRoute?.options[0]?.durationMinutes || 38,
+        language
+      );
 
       const aiResponseMsg: ConversationMessage = {
         id: uniqueId('msg_ai'),
@@ -270,18 +373,34 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         text: responseText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         language,
-        mobilityData: routes
+        mobilityRouteData: routes,
+        mobilityData: legacyRoutes
       };
 
       setMessages((prev) => [...prev, aiResponseMsg]);
       setVoiceState('SUCCESS');
       setWorkflowStage('COMPLETED');
       speakText(responseText);
-    } else if (intentResult.intent.startsWith('EMERGENCY')) {
-      const emergencies = await cityServiceRef.current.getEmergencyContacts();
-      setActiveEmergency(emergencies);
+    } else if (intentResult.intent === 'MOBILITY_NEARBY_STOP') {
+      const area = intentResult.entities.location || intentResult.entities.origin || conversationContext?.accumulatedEntities.origin || 'Ambattur';
+      const stops = await mobilityServiceRef.current.getNearbyStops(area);
 
-      const responseText = `Emergency dispatch lines activated for ${intentResult.intent.replace('EMERGENCY_', '')}. Direct helplines connected.`;
+      const updatedCtx: ConversationContext = {
+        ...updatedContext,
+        accumulatedEntities: {
+          ...updatedContext.accumulatedEntities,
+          location: area
+        }
+      };
+      setConversationContext(updatedCtx);
+
+      const responseText = formatLocalizedNearbyStopResponse(
+        area,
+        stops[0]?.name || 'Ambattur Bus Stop',
+        stops[0]?.walkingMinutes || 3,
+        stops.length,
+        language
+      );
 
       const aiResponseMsg: ConversationMessage = {
         id: uniqueId('msg_ai'),
@@ -289,20 +408,26 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         text: responseText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         language,
-        emergencyData: emergencies
+        mobilityStopsData: stops
       };
 
       setMessages((prev) => [...prev, aiResponseMsg]);
       setVoiceState('SUCCESS');
       setWorkflowStage('COMPLETED');
       speakText(responseText);
-    } else if (intentResult.intent === 'TRACK_REQUEST') {
-      const ticketId = intentResult.entities.requestId || 'MUNI-2026-8942';
-      const ticket = await cityServiceRef.current.getComplaintByTicketId(ticketId);
+    } else if (intentResult.intent === 'MOBILITY_BUS_STATUS') {
+      const destination = intentResult.entities.destination || conversationContext?.accumulatedEntities.destination || 'Chennai Central';
 
-      const responseText = ticket
-        ? `Status for Ticket ${ticket.ticketId}: ${ticket.status}. Assigned to ${ticket.assignedDepartment}.`
-        : `No ticket found with ID ${ticketId}. Please check the reference code.`;
+      const vehicles = await mobilityServiceRef.current.getBusStatus(undefined, destination);
+      const firstVeh = vehicles[0];
+
+      const responseText = formatLocalizedBusStatusResponse(
+        destination,
+        firstVeh ? firstVeh.vehicleNumber : 'M92',
+        firstVeh?.currentStop || 'Padi Junction',
+        firstVeh?.status.replace('_', ' ') || 'ON TIME',
+        language
+      );
 
       const aiResponseMsg: ConversationMessage = {
         id: uniqueId('msg_ai'),
@@ -310,7 +435,354 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         text: responseText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         language,
-        ticketData: ticket || undefined
+        mobilityVehicleData: vehicles
+      };
+
+      setMessages((prev) => [...prev, aiResponseMsg]);
+      setVoiceState('SUCCESS');
+      setWorkflowStage('COMPLETED');
+      speakText(responseText);
+    } else if (intentResult.intent === 'MOBILITY_ETA') {
+      const lastRoutes = (conversationContext?.accumulatedEntities.lastMobilityRoutes as Route[] | undefined) || (updatedContext.accumulatedEntities.lastMobilityRoutes as Route[] | undefined);
+      const routeIdx = intentResult.entities.routeIndex;
+
+      let responseText = '';
+      if (lastRoutes && lastRoutes.length > 0 && lastRoutes[0].options.length > 0) {
+        const options = lastRoutes[0].options;
+        if (routeIdx !== undefined && options[routeIdx]) {
+          const selected = options[routeIdx];
+          responseText = `The ${routeIdx === 0 ? 'first' : routeIdx === 1 ? 'second' : 'third'} route (**${selected.routeNumber}** - ${selected.title}) takes approximately **${selected.durationMinutes} minutes** (${selected.stopsCount} stops, ${selected.walkingDistanceMinutes} min walk).`;
+        } else if (userText.toLowerCase().includes('faster')) {
+          const sorted = [...options].sort((a, b) => a.durationMinutes - b.durationMinutes);
+          const fastest = sorted[0];
+          responseText = `Yes! Route **${fastest.routeNumber}** (${fastest.title}) is the fastest option, taking approximately **${fastest.durationMinutes} minutes**.`;
+        } else {
+          const defaultOpt = options[0];
+          responseText = `The estimated travel time from ${defaultOpt.origin} to ${defaultOpt.destination} via Route **${defaultOpt.routeNumber}** is **${defaultOpt.durationMinutes} minutes**.`;
+        }
+      } else {
+        const origin = intentResult.entities.origin || conversationContext?.accumulatedEntities.origin || 'Ambattur';
+        const destination = intentResult.entities.destination || conversationContext?.accumulatedEntities.destination || 'Chennai Central';
+        const etaObj = await mobilityServiceRef.current.getETA('M92', origin, destination);
+        responseText = `Estimated travel time to ${destination} is approximately **${etaObj?.minutes || 42} minutes** (${etaObj?.trafficCondition.toLowerCase() || 'moderate'} traffic condition).`;
+      }
+
+      const aiResponseMsg: ConversationMessage = {
+        id: uniqueId('msg_ai'),
+        sender: 'CITYVOICE_AI',
+        text: responseText,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        language
+      };
+
+      setMessages((prev) => [...prev, aiResponseMsg]);
+      setVoiceState('SUCCESS');
+      setWorkflowStage('COMPLETED');
+      speakText(responseText);
+    } else if (intentResult.intent === 'EMERGENCY_HOSPITAL' || intentResult.intent === 'EMERGENCY_POLICE' || intentResult.intent === 'EMERGENCY_FIRE') {
+      const type = intentResult.intent === 'EMERGENCY_HOSPITAL' ? 'HOSPITAL' : intentResult.intent === 'EMERGENCY_POLICE' ? 'POLICE' : 'FIRE_STATION';
+      const area = intentResult.entities.location || intentResult.entities.origin || conversationContext?.accumulatedEntities.location || 'Ambattur';
+
+      const facilities = await emergencyServiceRef.current.findNearbyFacilities(type, area);
+      const topFacility = facilities[0];
+
+      const updatedCtx: ConversationContext = {
+        ...updatedContext,
+        accumulatedEntities: {
+          ...updatedContext.accumulatedEntities,
+          facilityType: type,
+          lastEmergencyFacilities: facilities,
+          selectedFacility: topFacility
+        }
+      };
+      setConversationContext(updatedCtx);
+
+      const responseText = formatLocalizedEmergencyResponse(
+        type,
+        area,
+        facilities.length,
+        topFacility?.name || 'Emergency Center',
+        topFacility?.distanceKm || 1.2,
+        language
+      );
+
+      const aiResponseMsg: ConversationMessage = {
+        id: uniqueId('msg_ai'),
+        sender: 'CITYVOICE_AI',
+        text: responseText,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        language,
+        emergencyFacilityData: facilities
+      };
+
+      setMessages((prev) => [...prev, aiResponseMsg]);
+      setVoiceState('SUCCESS');
+      setWorkflowStage('COMPLETED');
+      speakText(responseText);
+    } else if (
+      userText.toLowerCase().includes('which one is closest') ||
+      userText.toLowerCase().includes('what\'s the phone number') ||
+      userText.toLowerCase().includes('phone number') ||
+      userText.toLowerCase().includes('contact number')
+    ) {
+      const lastFacilities = (conversationContext?.accumulatedEntities.lastEmergencyFacilities as EmergencyFacility[] | undefined) || (updatedContext.accumulatedEntities.lastEmergencyFacilities as EmergencyFacility[] | undefined);
+      let responseText = '';
+
+      if (lastFacilities && lastFacilities.length > 0) {
+        const top = lastFacilities[0];
+        if (userText.toLowerCase().includes('phone') || userText.toLowerCase().includes('contact')) {
+          responseText = `The helpline contact number for **${top.name}** is **${top.phone}**.`;
+        } else {
+          responseText = `The closest emergency facility is **${top.name}** located **${top.distanceKm} km away** at ${top.address}.`;
+        }
+      } else {
+        responseText = `I can help you find emergency hospitals, police stations, or fire departments. Which service do you need?`;
+      }
+
+      const aiResponseMsg: ConversationMessage = {
+        id: uniqueId('msg_ai'),
+        sender: 'CITYVOICE_AI',
+        text: responseText,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        language,
+        emergencyFacilityData: lastFacilities
+      };
+
+      setMessages((prev) => [...prev, aiResponseMsg]);
+      setVoiceState('SUCCESS');
+      setWorkflowStage('COMPLETED');
+      speakText(responseText);
+    } else if (
+      intentResult.intent === 'TRACK_REQUEST' ||
+      intentResult.intent === 'LIST_REQUESTS' ||
+      intentResult.intent === 'OPEN_REQUESTS' ||
+      intentResult.intent === 'RESOLVED_REQUESTS' ||
+      intentResult.intent === 'REQUEST_DETAILS'
+    ) {
+      const allComplaints = await cityServiceRef.current.getAllComplaints();
+      const lowerInput = userText.toLowerCase();
+
+      // Case A: Explicit Ticket ID match
+      if (intentResult.entities.requestId) {
+        const target = await cityServiceRef.current.getComplaintByTicketId(intentResult.entities.requestId);
+        if (target) {
+          const updatedCtx: ConversationContext = {
+            ...updatedContext,
+            accumulatedEntities: {
+              ...updatedContext.accumulatedEntities,
+              selectedComplaint: target
+            }
+          };
+          setConversationContext(updatedCtx);
+
+          const responseText = formatLocalizedTrackResultResponse(target, language);
+          const aiResponseMsg: ConversationMessage = {
+            id: uniqueId('msg_ai'),
+            sender: 'CITYVOICE_AI',
+            text: responseText,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            language,
+            ticketData: target
+          };
+
+          setMessages((prev) => [...prev, aiResponseMsg]);
+          setVoiceState('SUCCESS');
+          setWorkflowStage('COMPLETED');
+          speakText(responseText);
+          return;
+        } else {
+          const responseText = `I couldn't find any request matching Ticket ID **${intentResult.entities.requestId}**. Please check the reference code.`;
+          const aiResponseMsg: ConversationMessage = {
+            id: uniqueId('msg_ai'),
+            sender: 'CITYVOICE_AI',
+            text: responseText,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            language
+          };
+
+          setMessages((prev) => [...prev, aiResponseMsg]);
+          setVoiceState('SUCCESS');
+          setWorkflowStage('COMPLETED');
+          speakText(responseText);
+          return;
+        }
+      }
+
+      // Case B: Follow-up conversational question on previously selected complaint
+      const prevSelected = (conversationContext?.accumulatedEntities.selectedComplaint as CivicComplaint | undefined) || (updatedContext.accumulatedEntities.selectedComplaint as CivicComplaint | undefined);
+      if (prevSelected && (lowerInput.includes('when did i submit') || lowerInput.includes('when did i report') || lowerInput.includes('is it resolved') || lowerInput.includes('what department'))) {
+        let responseText = '';
+        if (lowerInput.includes('when did i')) {
+          responseText = `Complaint **${prevSelected.ticketId}** was submitted on ${new Date(prevSelected.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}.`;
+        } else if (lowerInput.includes('is it resolved')) {
+          responseText = prevSelected.status === 'RESOLVED' || prevSelected.status === 'CLOSED'
+            ? `Yes, complaint **${prevSelected.ticketId}** is resolved.`
+            : `No, complaint **${prevSelected.ticketId}** is currently **${prevSelected.status.replace('_', ' ')}**.`;
+        } else {
+          responseText = `Complaint **${prevSelected.ticketId}** is assigned to **${prevSelected.assignedDepartment}**.`;
+        }
+
+        const aiResponseMsg: ConversationMessage = {
+          id: uniqueId('msg_ai'),
+          sender: 'CITYVOICE_AI',
+          text: responseText,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          language,
+          ticketData: prevSelected
+        };
+
+        setMessages((prev) => [...prev, aiResponseMsg]);
+        setVoiceState('SUCCESS');
+        setWorkflowStage('COMPLETED');
+        speakText(responseText);
+        return;
+      }
+
+      // Case C: "Last Complaint" interpretation
+      if (lowerInput.includes('last complaint') || lowerInput.includes('last request') || lowerInput.includes('most recent')) {
+        if (allComplaints.length === 0) {
+          const responseText = "I couldn't find any previous requests. Would you like to report a new problem?";
+          const aiResponseMsg: ConversationMessage = {
+            id: uniqueId('msg_ai'),
+            sender: 'CITYVOICE_AI',
+            text: responseText,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            language
+          };
+          setMessages((prev) => [...prev, aiResponseMsg]);
+          setVoiceState('SUCCESS');
+          speakText(responseText);
+          return;
+        }
+
+        const sorted = [...allComplaints].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        const lastComplaint = sorted[0];
+
+        const updatedCtx: ConversationContext = {
+          ...updatedContext,
+          accumulatedEntities: {
+            ...updatedContext.accumulatedEntities,
+            selectedComplaint: lastComplaint
+          }
+        };
+        setConversationContext(updatedCtx);
+
+        const responseText = `Your most recent complaint **${lastComplaint.ticketId}** (${lastComplaint.category.replace('_', ' ')}) submitted on ${new Date(lastComplaint.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} is currently **${lastComplaint.status.replace('_', ' ')}**.`;
+
+        const aiResponseMsg: ConversationMessage = {
+          id: uniqueId('msg_ai'),
+          sender: 'CITYVOICE_AI',
+          text: responseText,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          language,
+          ticketData: lastComplaint
+        };
+
+        setMessages((prev) => [...prev, aiResponseMsg]);
+        setVoiceState('SUCCESS');
+        setWorkflowStage('COMPLETED');
+        speakText(responseText);
+        return;
+      }
+
+      // Case D: Category specific search (e.g. "my pothole complaint") with Disambiguation!
+      const catKeywords = ['pothole', 'garbage', 'trash', 'streetlight', 'water', 'road'];
+      const matchedCatKey = catKeywords.find((k) => lowerInput.includes(k));
+      
+      if (matchedCatKey) {
+        const catUpper = matchedCatKey === 'water' ? 'WATER_LEAKAGE' : matchedCatKey === 'road' ? 'ROAD_DAMAGE' : matchedCatKey.toUpperCase();
+        const matchingComplaints = allComplaints.filter((c) => c.category === catUpper || c.title.toLowerCase().includes(matchedCatKey) || c.description.toLowerCase().includes(matchedCatKey));
+
+        if (matchingComplaints.length === 1) {
+          const single = matchingComplaints[0];
+          const updatedCtx: ConversationContext = {
+            ...updatedContext,
+            accumulatedEntities: {
+              ...updatedContext.accumulatedEntities,
+              selectedComplaint: single
+            }
+          };
+          setConversationContext(updatedCtx);
+
+          const responseText = `Your ${single.category.toLowerCase().replace('_', ' ')} complaint **${single.ticketId}** near ${single.location} is currently **${single.status.replace('_', ' ')}**.`;
+
+          const aiResponseMsg: ConversationMessage = {
+            id: uniqueId('msg_ai'),
+            sender: 'CITYVOICE_AI',
+            text: responseText,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            language,
+            ticketData: single
+          };
+
+          setMessages((prev) => [...prev, aiResponseMsg]);
+          setVoiceState('SUCCESS');
+          setWorkflowStage('COMPLETED');
+          speakText(responseText);
+          return;
+        } else if (matchingComplaints.length > 1) {
+          // Disambiguation Prompt
+          const locationsList = matchingComplaints.slice(0, 3).map((c) => `the one near ${c.location}`).join(' or ');
+          const responseText = `I found ${matchingComplaints.length} ${matchedCatKey} complaints. Do you mean ${locationsList}?`;
+
+          const updatedCtx: ConversationContext = {
+            ...updatedContext,
+            accumulatedEntities: {
+              ...updatedContext.accumulatedEntities,
+              candidateComplaints: matchingComplaints
+            }
+          };
+          setConversationContext(updatedCtx);
+
+          const aiResponseMsg: ConversationMessage = {
+            id: uniqueId('msg_ai'),
+            sender: 'CITYVOICE_AI',
+            text: responseText,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            language
+          };
+
+          setMessages((prev) => [...prev, aiResponseMsg]);
+          setVoiceState('SUCCESS');
+          setWorkflowStage('COMPLETED');
+          speakText(responseText);
+          return;
+        }
+      }
+
+      // Case E: Filtering (OPEN / RESOLVED / ALL)
+      let filtered = allComplaints;
+      if (intentResult.intent === 'OPEN_REQUESTS') {
+        filtered = allComplaints.filter((c) => c.status !== 'RESOLVED' && c.status !== 'REJECTED');
+      } else if (intentResult.intent === 'RESOLVED_REQUESTS') {
+        filtered = allComplaints.filter((c) => c.status === 'RESOLVED' || c.status === 'CLOSED');
+      }
+
+      if (filtered.length === 0) {
+        const responseText = `No ${intentResult.intent === 'OPEN_REQUESTS' ? 'open' : intentResult.intent === 'RESOLVED_REQUESTS' ? 'resolved' : ''} requests found in your record.`;
+        const aiResponseMsg: ConversationMessage = {
+          id: uniqueId('msg_ai'),
+          sender: 'CITYVOICE_AI',
+          text: responseText,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          language
+        };
+        setMessages((prev) => [...prev, aiResponseMsg]);
+        setVoiceState('SUCCESS');
+        speakText(responseText);
+        return;
+      }
+
+      const topItem = filtered[0];
+      const responseText = `You have ${filtered.length} ${intentResult.intent === 'OPEN_REQUESTS' ? 'open' : intentResult.intent === 'RESOLVED_REQUESTS' ? 'resolved' : ''} requests. The latest is **${topItem.ticketId}** (${topItem.title}) - Status: **${topItem.status.replace('_', ' ')}**.`;
+
+      const aiResponseMsg: ConversationMessage = {
+        id: uniqueId('msg_ai'),
+        sender: 'CITYVOICE_AI',
+        text: responseText,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        language,
+        ticketData: topItem
       };
 
       setMessages((prev) => [...prev, aiResponseMsg]);
@@ -318,7 +790,7 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setWorkflowStage('COMPLETED');
       speakText(responseText);
     } else {
-      const responseText = 'I can help you report potholes or garbage, check bus schedules, or connect to emergency dispatch. What would you like to do?';
+      const responseText = formatLocalizedDefaultHelpResponse(language);
       const aiResponseMsg: ConversationMessage = {
         id: uniqueId('msg_ai'),
         sender: 'CITYVOICE_AI',
@@ -357,7 +829,12 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setVerificationDraft(null);
     setWorkflowStage('CONFIRM');
 
-    const confirmationText = `Ticket ${ticket.ticketId} has been registered! Estimated resolution within ${ticket.estimatedResolutionHours} hours.`;
+    const confirmationText = formatLocalizedComplaintCreatedResponse(
+      ticket.ticketId,
+      ticket.assignedDepartment,
+      ticket.estimatedResolutionHours,
+      language
+    );
 
     const confirmMsg: ConversationMessage = {
       id: uniqueId('msg_confirm'),
@@ -403,9 +880,15 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return res;
   };
 
+  const getRequestStatusHistory = async (ticketId: string): Promise<RequestStatusHistory[]> => {
+    return await cityServiceRef.current.getRequestStatusHistory(ticketId);
+  };
+
   return (
     <CivicContext.Provider
       value={{
+        toolRegistry: toolRegistryRef.current,
+        workflowOrchestrator: workflowOrchestratorRef.current,
         language,
         fullLanguage: LANG_MAP[language],
         setLanguage,
@@ -425,6 +908,7 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         trackTicket,
         submitComplaint,
         updateComplaintStatus,
+        getRequestStatusHistory,
         complaints,
         refreshComplaints,
         activeMobility,
@@ -432,7 +916,10 @@ export const CivicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isMockMode: cityServiceRef.current.isMock,
         speakText,
         stopSpeaking,
-        conversationContext
+        conversationContext,
+        isContinuousVoiceMode,
+        setIsContinuousVoiceMode,
+        toggleContinuousVoiceMode
       }}
     >
       {children}

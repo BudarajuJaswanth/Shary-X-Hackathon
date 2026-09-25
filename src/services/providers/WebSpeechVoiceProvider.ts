@@ -113,11 +113,16 @@ export class WebSpeechVoiceProvider implements IVoiceProvider {
     } catch {
       try {
         this.recognition.stop();
-        this.recognition.start();
-      } catch (err: any) {
-        this.updateState('ERROR');
-        this.options?.onError(`Failed to start recording: ${err.message}`);
+      } catch (e) {
+        // Ignored
       }
+      setTimeout(() => {
+        try {
+          this.recognition.start();
+        } catch (err: any) {
+          console.warn('Speech recognition restart notice:', err?.message);
+        }
+      }, 150);
     }
   }
 

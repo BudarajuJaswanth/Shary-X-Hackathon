@@ -3,6 +3,15 @@ import type { LanguageCode } from '../types/civic';
 export interface TranslationDictionary {
   appName: string;
   tagline: string;
+  home: string;
+  voiceInteraction: string;
+  myRequests: string;
+  reportProblem: string;
+  findTransport: string;
+  emergencyHelp: string;
+  language: string;
+  settings: string;
+  requestStatus: string;
   listening: string;
   understanding: string;
   speaking: string;
@@ -34,12 +43,39 @@ export interface TranslationDictionary {
   mockModeActive: string;
   sharyxReady: string;
   quickPromptsTitle: string;
+  // Statuses
+  statusSubmitted: string;
+  statusAssigned: string;
+  statusInProgress: string;
+  statusResolved: string;
+  statusClosed: string;
+  // Filter Tabs
+  filterAll: string;
+  filterOpen: string;
+  filterInProgress: string;
+  filterResolved: string;
+  // Common Labels & Empty States
+  emptyStateTitle: string;
+  emptyStateSub: string;
+  chooseLanguageTitle: string;
+  loadingMessage: string;
+  errorMessage: string;
+  tryAgain: string;
 }
 
 export const TRANSLATIONS: Record<LanguageCode, TranslationDictionary> = {
   en: {
     appName: 'CITYVOICE AI',
     tagline: 'Your city, one conversation away',
+    home: 'Home',
+    voiceInteraction: 'Voice AI',
+    myRequests: 'My Requests',
+    reportProblem: 'Report Problem',
+    findTransport: 'Transit / Mobility',
+    emergencyHelp: 'Emergency Help',
+    language: 'Language',
+    settings: 'Settings',
+    requestStatus: 'Request Status',
     listening: 'Listening to your request...',
     understanding: 'Analyzing intent & extracting parameters...',
     speaking: 'CityVoice AI responding...',
@@ -70,11 +106,35 @@ export const TRANSLATIONS: Record<LanguageCode, TranslationDictionary> = {
     languageName: 'English',
     mockModeActive: 'Mock Civic Engine Active',
     sharyxReady: 'SharyX Adapter Ready',
-    quickPromptsTitle: 'Try asking CityVoice AI:'
+    quickPromptsTitle: 'Try asking CityVoice AI:',
+    statusSubmitted: 'Submitted',
+    statusAssigned: 'Assigned',
+    statusInProgress: 'In Progress',
+    statusResolved: 'Resolved',
+    statusClosed: 'Closed',
+    filterAll: 'All',
+    filterOpen: 'Open',
+    filterInProgress: 'In Progress',
+    filterResolved: 'Resolved',
+    emptyStateTitle: 'No requests yet',
+    emptyStateSub: 'When you report a city problem, your requests will appear here.',
+    chooseLanguageTitle: 'Choose Your Preferred Language',
+    loadingMessage: 'Processing request...',
+    errorMessage: 'We couldn\'t retrieve your request right now.',
+    tryAgain: 'Try Again'
   },
   ta: {
     appName: 'சிட்டிவாய்ஸ் AI',
     tagline: 'உங்கள் நகரம், ஒரு உரையாடல் தூரத்தில்',
+    home: 'முகப்பு',
+    voiceInteraction: 'குரல் உதவி',
+    myRequests: 'என் கோரிக்கைகள்',
+    reportProblem: 'புகார் அளிக்கவும்',
+    findTransport: 'போக்குவரத்து தகவல்கள்',
+    emergencyHelp: 'அவசர உதவி',
+    language: 'மொழி',
+    settings: 'அமைப்புகள்',
+    requestStatus: 'புகாரின் நிலை',
     listening: 'உங்கள் குரலைக் கேட்கிறது...',
     understanding: 'செய்தியைப் புரிந்துகொள்கிறது...',
     speaking: 'பதிலளிக்கிறது...',
@@ -105,11 +165,35 @@ export const TRANSLATIONS: Record<LanguageCode, TranslationDictionary> = {
     languageName: 'தமிழ்',
     mockModeActive: 'மாதிரி நகராட்சி இயங்குகிறது',
     sharyxReady: 'SharyX அடாப்டர் தயார்',
-    quickPromptsTitle: 'இவற்றை முயன்று பாருங்கள்:'
+    quickPromptsTitle: 'இவற்றை முயன்று பாருங்கள்:',
+    statusSubmitted: 'சமர்ப்பிக்கப்பட்டது',
+    statusAssigned: 'ஒதுக்கப்பட்டது',
+    statusInProgress: 'செயல்பாட்டில் உள்ளது',
+    statusResolved: 'தீர்வு காணப்பட்டது',
+    statusClosed: 'மூடப்பட்டது',
+    filterAll: 'அனைத்தும்',
+    filterOpen: 'நிலுவையில் உள்ளவை',
+    filterInProgress: 'செயல்பாட்டில் உள்ளவை',
+    filterResolved: 'தீர்வு காணப்பட்டவை',
+    emptyStateTitle: 'கோரிக்கைகள் ஏதும் இல்லை',
+    emptyStateSub: 'நீங்கள் அளிக்கும் நகராட்சி புகார்கள் இங்கே தோன்றும்.',
+    chooseLanguageTitle: 'உங்கள் மொழியைத் தேர்ந்தெடுக்கவும்',
+    loadingMessage: 'கோரிக்கை செயலாக்கப்படுகிறது...',
+    errorMessage: 'தகவல்களை பெற இயலவில்லை.',
+    tryAgain: 'மீண்டும் முயல்க'
   },
   te: {
     appName: 'సిటీవాయిస్ AI',
     tagline: 'మీ నగరం, ఒక సంభాషణ దూరంలో',
+    home: 'హోమ్',
+    voiceInteraction: 'వాయిస్ సహాయం',
+    myRequests: 'నా అభ్యర్థనలు',
+    reportProblem: 'ఫిర్యాదు చేయండి',
+    findTransport: 'రవాణా సమాచారం',
+    emergencyHelp: 'అత్యవసర సహాయం',
+    language: 'భాష',
+    settings: 'సెట్టింగ్‌లు',
+    requestStatus: 'ఫిర్యాదు స్థితి',
     listening: 'మీ మాటలను వింటోంది...',
     understanding: 'సమాచారాన్ని విశ్లేషిస్తోంది...',
     speaking: 'సమాధానం ఇస్తోంది...',
@@ -140,6 +224,26 @@ export const TRANSLATIONS: Record<LanguageCode, TranslationDictionary> = {
     languageName: 'తెలుగు',
     mockModeActive: 'మాక్ మున్సిపల్ ఇంజన్ యాక్టివ్',
     sharyxReady: 'SharyX అడాప్టర్ సిద్ధంగా ఉంది',
-    quickPromptsTitle: 'వీటిని అడిగి చూడండి:'
+    quickPromptsTitle: 'వీటిని అడిగి చూడండి:',
+    statusSubmitted: 'సమర్పించబడింది',
+    statusAssigned: 'కేటాయించబడింది',
+    statusInProgress: 'పురోగతిలో ఉంది',
+    statusResolved: 'పరిష్కరించబడింది',
+    statusClosed: 'మూసివేయబడింది',
+    filterAll: 'అన్నీ',
+    filterOpen: 'తెరిచి ఉన్నవి',
+    filterInProgress: 'పురోగతిలో ఉన్నవి',
+    filterResolved: 'పరిష్కరించబడినవి',
+    emptyStateTitle: 'అభ్యర్థనలు లేవు',
+    emptyStateSub: 'మీరు ఫిర్యాదు చేసిన వివరాలు ఇక్కడ కనిపిస్తాయి.',
+    chooseLanguageTitle: 'మీ భాషను ఎంచుకోండి',
+    loadingMessage: 'సమాచారం ప్రాసెస్ చేయబడుతోంది...',
+    errorMessage: 'సమాచారం పొందుపరచలేకపోయాము.',
+    tryAgain: 'మళ్ళీ ప్రయత్నించండి'
   }
 };
+
+export function getTranslation(lang: LanguageCode, key: keyof TranslationDictionary): string {
+  const dict = TRANSLATIONS[lang] || TRANSLATIONS['en'];
+  return dict[key] || TRANSLATIONS['en'][key] || key;
+}

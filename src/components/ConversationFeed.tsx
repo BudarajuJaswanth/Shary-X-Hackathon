@@ -2,10 +2,20 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useCivicContext } from '../context/CivicContext';
 import { MobilityWidget } from './MobilityWidget';
 import { EmergencyWidget } from './EmergencyWidget';
-import { Send, Volume2, User, Bot, Copy, Check, ShieldCheck, Clock } from 'lucide-react';
+import { Send, Volume2, User, Bot, Copy, Check, ShieldCheck, Clock, Mic, MicOff, Radio, RefreshCw } from 'lucide-react';
 
 export const ConversationFeed: React.FC = () => {
-  const { messages, sendTextMessage, speakText, language } = useCivicContext();
+  const {
+    messages,
+    sendTextMessage,
+    speakText,
+    language,
+    voiceState,
+    toggleListening,
+    transcript,
+    isContinuousVoiceMode,
+    toggleContinuousVoiceMode
+  } = useCivicContext();
   const [textInput, setTextInput] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const feedEndRef = useRef<HTMLDivElement | null>(null);
@@ -118,14 +128,19 @@ export const ConversationFeed: React.FC = () => {
                   </div>
                 )}
 
-                {/* Mobility Route Card */}
-                {msg.mobilityData && msg.mobilityData.length > 0 && (
-                  <MobilityWidget routes={msg.mobilityData} />
+                {/* Mobility Route / Stops / Bus Status Cards */}
+                {(msg.mobilityRouteData || msg.mobilityStopsData || msg.mobilityVehicleData || (msg.mobilityData && msg.mobilityData.length > 0)) && (
+                  <MobilityWidget
+                    routes={msg.mobilityData}
+                    routeData={msg.mobilityRouteData}
+                    stopsData={msg.mobilityStopsData}
+                    vehicleData={msg.mobilityVehicleData}
+                  />
                 )}
 
-                {/* Emergency Card */}
-                {msg.emergencyData && msg.emergencyData.length > 0 && (
-                  <EmergencyWidget contacts={msg.emergencyData} />
+                {/* Emergency Facilities / Contacts Card */}
+                {((msg.emergencyFacilityData && msg.emergencyFacilityData.length > 0) || (msg.emergencyData && msg.emergencyData.length > 0)) && (
+                  <EmergencyWidget contacts={msg.emergencyData} facilities={msg.emergencyFacilityData} />
                 )}
               </div>
             </div>
@@ -134,25 +149,66 @@ export const ConversationFeed: React.FC = () => {
         <div ref={feedEndRef} />
       </div>
 
-      {/* Fallback Text Input Bar */}
-      <form onSubmit={handleSubmit} className="text-input-form">
-        <input
-          type="text"
-          className="chat-text-input"
-          placeholder={
-            language === 'ta'
-              ? 'அல்லது உங்கள் செய்தியை இங்கு தட்டச்சு செய்யவும்...'
-              : language === 'te'
-              ? 'లేదా మీ సందేశాన్ని ఇక్కడ టైప్ చేయండి...'
-              : 'Or type your request here (e.g. Report pothole near Anna Nagar)...'
-          }
-          value={textInput}
-          onChange={(e) => setTextInput(e.target.value)}
-        />
-        <button type="submit" className="send-btn" disabled={!textInput.trim()}>
-          <Send size={18} />
+      {/* Live Transcript / Voice State Indicator */}
+      {transcript ? (
+        <div className="feed-transcript-banner">
+          <Radio size={14} className="pulse-icon text-cyan" />
+          <span>Speech Input: "{transcript}"</span>
+        </div>
+      ) : voiceState === 'LISTENING' ? (
+        <div className="feed-transcript-banner listening">
+          <Radio size={14} className="pulse-icon text-cyan" />
+          <span>[LISTENING] 1-on-1 Voice Mode Active... Speak naturally into your mic</span>
+        </div>
+      ) : null}
+
+      {/* Interactive Sticky Voice & Text Input Bar */}
+      <div className="feed-interactive-bar">
+        {/* Toggle Continuous 1-on-1 Mode */}
+        <button
+          type="button"
+          className={`continuous-mode-toggle ${isContinuousVoiceMode ? 'active' : ''}`}
+          onClick={toggleContinuousVoiceMode}
+          title="Toggle 1-on-1 Continuous Voice Conversation Mode"
+        >
+          <RefreshCw size={13} className={isContinuousVoiceMode ? 'spin-subtle' : ''} />
+          <span>1-on-1 Voice Mode: {isContinuousVoiceMode ? 'ON' : 'OFF'}</span>
         </button>
-      </form>
+
+        {/* Inline Mic Button */}
+        <button
+          type="button"
+          className={`inline-mic-btn ${voiceState.toLowerCase()}`}
+          onClick={toggleListening}
+          title={voiceState === 'LISTENING' ? 'Stop listening' : 'Start 1-on-1 voice conversation'}
+        >
+          {voiceState === 'LISTENING' ? (
+            <MicOff size={18} className="mic-active-pulse" />
+          ) : (
+            <Mic size={18} />
+          )}
+        </button>
+
+        {/* Fallback Text Input Form */}
+        <form onSubmit={handleSubmit} className="text-input-form-inline">
+          <input
+            type="text"
+            className="chat-text-input"
+            placeholder={
+              language === 'ta'
+                ? 'அல்லது உங்கள் செய்தியை இங்கு தட்டச்சு செய்யவும்...'
+                : language === 'te'
+                ? 'లేదా మీ సందేశాన్ని ఇక్కడ టైప్ చేయండి...'
+                : 'Speak into mic or type your message here...'
+            }
+            value={textInput}
+            onChange={(e) => setTextInput(e.target.value)}
+          />
+          <button type="submit" className="send-btn" disabled={!textInput.trim()}>
+            <Send size={16} />
+          </button>
+        </form>
+      </div>
     </div>
   );
 };

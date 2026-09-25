@@ -28,9 +28,28 @@ export const ComplaintTracker: React.FC = () => {
     }
   };
 
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+
   const filteredComplaints = complaints.filter((c) => {
-    if (filterStatus === 'ALL') return true;
-    return c.status === filterStatus;
+    // Status Filter
+    if (filterStatus === 'OPEN' && (c.status === 'RESOLVED' || c.status === 'CLOSED')) return false;
+    if (filterStatus === 'RESOLVED' && c.status !== 'RESOLVED' && c.status !== 'CLOSED') return false;
+    if (filterStatus === 'IN_PROGRESS' && c.status !== 'IN_PROGRESS') return false;
+
+    // Category Filter
+    if (categoryFilter !== 'ALL' && c.category !== categoryFilter) return false;
+
+    // Text Search
+    if (searchId.trim()) {
+      const q = searchId.trim().toLowerCase();
+      const matchId = c.ticketId.toLowerCase().includes(q);
+      const matchCat = c.category.toLowerCase().includes(q);
+      const matchLoc = c.location.toLowerCase().includes(q);
+      const matchDesc = c.description.toLowerCase().includes(q);
+      return matchId || matchCat || matchLoc || matchDesc;
+    }
+
+    return true;
   });
 
   const getStepProgress = (status: TicketStatus) => {
@@ -149,78 +168,118 @@ export const ComplaintTracker: React.FC = () => {
 
           <div className="complaints-list-section">
             <div className="list-header">
-              <h3>Registered Municipal Requests ({filteredComplaints.length})</h3>
+              <h3>My Municipal Requests ({filteredComplaints.length})</h3>
               <div className="filter-tabs">
                 <Filter size={14} className="filter-icon" />
-                {['ALL', 'REGISTERED', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED'].map((st) => (
+                {[
+                  { key: 'ALL', label: 'All' },
+                  { key: 'OPEN', label: 'Open' },
+                  { key: 'IN_PROGRESS', label: 'In Progress' },
+                  { key: 'RESOLVED', label: 'Resolved' }
+                ].map((f) => (
                   <button
-                    key={st}
-                    className={`filter-pill ${filterStatus === st ? 'active' : ''}`}
-                    onClick={() => setFilterStatus(st)}
+                    key={f.key}
+                    className={`filter-pill ${filterStatus === f.key ? 'active' : ''}`}
+                    onClick={() => setFilterStatus(f.key)}
                   >
-                    {st.replace('_', ' ')}
+                    {f.label}
                   </button>
                 ))}
+                <select
+                  aria-label="Filter by Category"
+                  className="category-filter-select"
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  style={{
+                    marginLeft: '8px',
+                    padding: '4px 8px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    background: 'rgba(15,23,42,0.6)',
+                    color: '#e2e8f0',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="ALL">All Categories</option>
+                  <option value="POTHOLE">Pothole</option>
+                  <option value="GARBAGE">Garbage</option>
+                  <option value="STREETLIGHT">Streetlight</option>
+                  <option value="WATER_LEAKAGE">Water Leakage</option>
+                  <option value="ROAD_DAMAGE">Road Damage</option>
+                  <option value="OTHER">Other</option>
+                </select>
               </div>
             </div>
 
-            <div className="cards-grid">
-              {filteredComplaints.map((item) => {
-                const step = getStepProgress(item.status);
-                return (
-                  <div
-                    key={item.id}
-                    className="complaint-card clickable-card"
-                    onClick={() => setSelectedComplaint(item)}
-                  >
-                    <div className="card-top">
-                      <span className="category-pill">{item.category}</span>
-                      <span className="ticket-code">{item.ticketId}</span>
-                      <span className={`priority-badge priority-${item.priority.toLowerCase()}`}>
-                        {item.priority} Priority
-                      </span>
-                    </div>
+            {filteredComplaints.length === 0 ? (
+              <div className="empty-requests-card">
+                <ShieldCheck size={40} className="empty-icon text-cyan" />
+                <h4>No requests found</h4>
+                <p>When you report a city problem via voice or text, your active & past requests will appear here.</p>
+                <button className="report-problem-btn" onClick={() => setShowManualForm(true)}>
+                  <FilePlus size={16} /> Report a Problem
+                </button>
+              </div>
+            ) : (
+              <div className="cards-grid">
+                {filteredComplaints.map((item) => {
+                  const step = getStepProgress(item.status);
+                  return (
+                    <div
+                      key={item.id}
+                      className="complaint-card clickable-card"
+                      onClick={() => setSelectedComplaint(item)}
+                    >
+                      <div className="card-top">
+                        <span className="category-pill">{item.category}</span>
+                        <span className="ticket-code">{item.ticketId}</span>
+                        <span className={`status-pill status-${item.status.toLowerCase()}`}>
+                          ● {item.status.replace('_', ' ')}
+                        </span>
+                      </div>
 
-                    <h4 className="card-title">{item.title}</h4>
-                    <p className="card-desc">{item.description}</p>
+                      <h4 className="card-title">{item.title}</h4>
+                      <p className="card-desc">{item.description}</p>
 
-                    <div className="card-meta">
-                      <div className="meta-row">
-                        <MapPin size={14} className="icon" />
-                        <span>{item.location}</span>
+                      <div className="card-meta">
+                        <div className="meta-row">
+                          <MapPin size={14} className="icon" />
+                          <span>{item.location}</span>
+                        </div>
+                        <div className="meta-row">
+                          <Building size={14} className="icon" />
+                          <span>{item.assignedDepartment}</span>
+                        </div>
+                        <div className="meta-row">
+                          <Clock size={14} className="icon" />
+                          <span>Submitted {new Date(item.createdAt).toLocaleDateString()}</span>
+                        </div>
                       </div>
-                      <div className="meta-row">
-                        <Building size={14} className="icon" />
-                        <span>{item.assignedDepartment}</span>
-                      </div>
-                      <div className="meta-row">
-                        <Clock size={14} className="icon" />
-                        <span>Resolution SLA: {item.estimatedResolutionHours} hrs</span>
+
+                      <div className="timeline-progress">
+                        <div className={`timeline-step ${step >= 1 ? 'done' : ''}`}>
+                          <span className="dot"></span>
+                          <span className="lbl">Submitted</span>
+                        </div>
+                        <div className={`timeline-step ${step >= 2 ? 'done' : ''}`}>
+                          <span className="dot"></span>
+                          <span className="lbl">Assigned</span>
+                        </div>
+                        <div className={`timeline-step ${step >= 3 ? 'done' : ''}`}>
+                          <span className="dot"></span>
+                          <span className="lbl">In Progress</span>
+                        </div>
+                        <div className={`timeline-step ${step >= 4 ? 'done' : ''}`}>
+                          <span className="dot"></span>
+                          <span className="lbl">Resolved</span>
+                        </div>
                       </div>
                     </div>
-
-                    <div className="timeline-progress">
-                      <div className={`timeline-step ${step >= 1 ? 'done' : ''}`}>
-                        <span className="dot"></span>
-                        <span className="lbl">Submitted</span>
-                      </div>
-                      <div className={`timeline-step ${step >= 2 ? 'done' : ''}`}>
-                        <span className="dot"></span>
-                        <span className="lbl">Assigned</span>
-                      </div>
-                      <div className={`timeline-step ${step >= 3 ? 'done' : ''}`}>
-                        <span className="dot"></span>
-                        <span className="lbl">In Progress</span>
-                      </div>
-                      <div className={`timeline-step ${step >= 4 ? 'done' : ''}`}>
-                        <span className="dot"></span>
-                        <span className="lbl">Resolved</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </>
       )}

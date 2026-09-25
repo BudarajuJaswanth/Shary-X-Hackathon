@@ -1,5 +1,6 @@
 import type { ICityServiceProvider } from './ICityServiceProvider';
 import type { CivicComplaint, MobilityRoute, EmergencyContact, TicketStatus } from '../../types/civic';
+import type { RequestStatusHistory } from '../../domain/models';
 import { SupabaseCivicRepository } from '../database/SupabaseCivicRepository';
 import { MockCityServiceProvider } from './MockCityServiceProvider';
 
@@ -36,13 +37,13 @@ export class SupabaseCityServiceProvider implements ICityServiceProvider {
     }
   }
 
-  public async getAllComplaints(): Promise<CivicComplaint[]> {
+  public async getAllComplaints(filterStatus?: string): Promise<CivicComplaint[]> {
     try {
-      const results = await this.repository.listComplaints();
+      const results = await this.repository.listComplaints(filterStatus);
       if (results.length > 0) return results;
-      return await this.fallbackMock.getAllComplaints();
+      return await this.fallbackMock.getAllComplaints(filterStatus);
     } catch {
-      return await this.fallbackMock.getAllComplaints();
+      return await this.fallbackMock.getAllComplaints(filterStatus);
     }
   }
 
@@ -57,6 +58,16 @@ export class SupabaseCityServiceProvider implements ICityServiceProvider {
       return await this.fallbackMock.updateComplaintStatus(ticketId, status, note);
     } catch {
       return await this.fallbackMock.updateComplaintStatus(ticketId, status, note);
+    }
+  }
+
+  public async getRequestStatusHistory(ticketId: string): Promise<RequestStatusHistory[]> {
+    try {
+      const history = await this.repository.getRequestStatusHistory(ticketId);
+      if (history.length > 0) return history;
+      return await this.fallbackMock.getRequestStatusHistory(ticketId);
+    } catch {
+      return await this.fallbackMock.getRequestStatusHistory(ticketId);
     }
   }
 

@@ -6,7 +6,7 @@ import { BottomNav } from '../ui/BottomNav';
 import { ToastProvider } from '../ui/Toast';
 import { useCivicContext } from '../../context/CivicContext';
 
-export type ActiveTabType = 'CONVERSATION' | 'TRACKER' | 'ADMIN' | 'OUR_STORY' | 'LOGIN';
+export type ActiveTabType = 'MAIN' | 'CONVERSATION' | 'TRACKER' | 'ADMIN' | 'OUR_STORY' | 'LOGIN';
 
 interface AppShellProps {
   children: React.ReactNode;

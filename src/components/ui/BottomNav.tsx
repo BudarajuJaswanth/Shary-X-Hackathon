@@ -1,14 +1,25 @@
 import React from 'react';
-import { MessageSquareText, ShieldCheck, Heart, User } from 'lucide-react';
+import { Sparkles, MessageSquareText, ShieldCheck, Heart, User } from 'lucide-react';
+import type { ActiveTabType } from '../shell/AppShell';
 
 export interface BottomNavProps {
-  activeTab: 'CONVERSATION' | 'TRACKER' | 'ADMIN' | 'OUR_STORY' | 'LOGIN';
-  setActiveTab: (tab: 'CONVERSATION' | 'TRACKER' | 'ADMIN' | 'OUR_STORY' | 'LOGIN') => void;
+  activeTab: ActiveTabType;
+  setActiveTab: (tab: ActiveTabType) => void;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
   return (
     <nav className="cv-bottom-nav" aria-label="Mobile navigation">
+      <button
+        type="button"
+        className={`cv-bottom-nav-item ${activeTab === 'MAIN' ? 'active' : ''}`}
+        aria-current={activeTab === 'MAIN' ? 'page' : undefined}
+        onClick={() => setActiveTab('MAIN')}
+      >
+        <Sparkles size={20} aria-hidden="true" />
+        <span className="cv-bottom-nav-label">Overview</span>
+      </button>
+
       <button
         type="button"
         className={`cv-bottom-nav-item ${activeTab === 'CONVERSATION' ? 'active' : ''}`}

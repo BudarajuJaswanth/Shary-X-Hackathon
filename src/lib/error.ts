@@ -40,6 +40,16 @@ export class ToolExecutionError extends AppError {
   }
 }
 
+export class ValidationFailedError extends AppError {
+  public missingParameters?: string[];
+
+  constructor(toolName: string, message: string, missingParameters?: string[]) {
+    super(`Validation failed for [${toolName}]: ${message}`, 'VALIDATION_FAILED_ERROR', 'WARNING');
+    this.name = 'ValidationFailedError';
+    this.missingParameters = missingParameters;
+  }
+}
+
 export type Result<T, E = AppError> =
   | { success: true; data: T }
   | { success: false; error: E };

@@ -1,5 +1,6 @@
 import type { ICityServiceProvider } from './ICityServiceProvider';
 import type { CivicComplaint, MobilityRoute, EmergencyContact, TicketStatus } from '../../types/civic';
+import type { RequestStatusHistory } from '../../domain/models';
 
 const STORAGE_KEY = 'cityvoice_civic_complaints';
 
@@ -51,6 +52,38 @@ const INITIAL_MOCK_COMPLAINTS: CivicComplaint[] = [
     updatedAt: new Date(Date.now() - 3600000).toISOString(),
     estimatedResolutionHours: 48,
     assignedDepartment: 'Electrical & Lighting Maintenance Division',
+    language: 'en'
+  },
+  {
+    id: 'c4',
+    ticketId: 'CIV-2026-9214',
+    category: 'WATER_LEAKAGE',
+    title: 'Burst Main Pipeline & Flooding',
+    description: 'Major water pipeline leak flooding main junction road and reducing water pressure.',
+    location: 'MTH Road, Ambattur OT, Chennai',
+    landmark: 'Near Telephone Exchange',
+    priority: 'CRITICAL',
+    status: 'RESOLVED',
+    createdAt: new Date(Date.now() - 259200000).toISOString(),
+    updatedAt: new Date(Date.now() - 86400000).toISOString(),
+    estimatedResolutionHours: 12,
+    assignedDepartment: 'Metropolitan Water Supply & Sewage Board',
+    language: 'en'
+  },
+  {
+    id: 'c5',
+    ticketId: 'CIV-2026-3088',
+    category: 'ROAD_DAMAGE',
+    title: 'Cave-in Hazard Near Bus Stop',
+    description: 'Road surface sinking after heavy rain, creating severe hazard for heavy vehicles.',
+    location: 'Mount Road, Guindy, Chennai',
+    landmark: 'Opposite Metro Station Exit B',
+    priority: 'HIGH',
+    status: 'CLOSED',
+    createdAt: new Date(Date.now() - 345600000).toISOString(),
+    updatedAt: new Date(Date.now() - 172800000).toISOString(),
+    estimatedResolutionHours: 36,
+    assignedDepartment: 'Highways & Infrastructure Maintenance',
     language: 'en'
   }
 ];
@@ -215,16 +248,80 @@ export class MockCityServiceProvider implements ICityServiceProvider {
     return complaints.find((c) => c.ticketId.toUpperCase() === cleanSearch || c.id === ticketId) || null;
   }
 
-  public async getAllComplaints(): Promise<CivicComplaint[]> {
+  public async getAllComplaints(filterStatus?: string): Promise<CivicComplaint[]> {
+    let list: CivicComplaint[] = [];
     if (!this.hasLocalStorage()) {
-      return this.memoryStore;
+      list = this.memoryStore;
+    } else {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        list = raw ? JSON.parse(raw) : INITIAL_MOCK_COMPLAINTS;
+      } catch {
+        list = INITIAL_MOCK_COMPLAINTS;
+      }
     }
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : INITIAL_MOCK_COMPLAINTS;
-    } catch {
-      return INITIAL_MOCK_COMPLAINTS;
+
+    if (filterStatus && filterStatus !== 'ALL') {
+      if (filterStatus === 'OPEN') {
+        return list.filter((c) => c.status !== 'RESOLVED' && c.status !== 'CLOSED');
+      }
+      return list.filter((c) => c.status === filterStatus);
     }
+    return list;
+  }
+
+  public async getRequestStatusHistory(ticketId: string): Promise<RequestStatusHistory[]> {
+    const complaint = await this.getComplaintByTicketId(ticketId);
+    if (!complaint) return [];
+
+    const baseTime = new Date(complaint.createdAt).getTime();
+    const history: RequestStatusHistory[] = [
+      {
+        id: `hist_${complaint.ticketId}_1`,
+        requestId: complaint.ticketId,
+        status: 'REGISTERED',
+        timestamp: complaint.createdAt,
+        note: 'Request registered & logged into municipal system via CityVoice AI.',
+        updatedByDepartment: 'CityVoice Automated Portal'
+      }
+    ];
+
+    const currentStatus = complaint.status;
+
+    if (['ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].includes(currentStatus)) {
+      history.push({
+        id: `hist_${complaint.ticketId}_2`,
+        requestId: complaint.ticketId,
+        status: 'ASSIGNED',
+        timestamp: new Date(baseTime + 3600000).toISOString(),
+        note: `Assigned to ${complaint.assignedDepartment}.`,
+        updatedByDepartment: complaint.assignedDepartment
+      });
+    }
+
+    if (['IN_PROGRESS', 'RESOLVED', 'CLOSED'].includes(currentStatus)) {
+      history.push({
+        id: `hist_${complaint.ticketId}_3`,
+        requestId: complaint.ticketId,
+        status: 'IN_PROGRESS',
+        timestamp: new Date(baseTime + 7200000).toISOString(),
+        note: 'Field inspection & repair crew deployed on site.',
+        updatedByDepartment: complaint.assignedDepartment
+      });
+    }
+
+    if (['RESOLVED', 'CLOSED'].includes(currentStatus)) {
+      history.push({
+        id: `hist_${complaint.ticketId}_4`,
+        requestId: complaint.ticketId,
+        status: 'RESOLVED',
+        timestamp: complaint.updatedAt,
+        note: 'Maintenance completed and verified by municipal inspector.',
+        updatedByDepartment: complaint.assignedDepartment
+      });
+    }
+
+    return history;
   }
 
   public async updateComplaintStatus(
@@ -271,6 +368,12 @@ export class MockCityServiceProvider implements ICityServiceProvider {
 
   public async getEmergencyContacts(category?: string): Promise<EmergencyContact[]> {
     if (category) {
+      const catUpper = category.toUpperCase();
+      if (catUpper === 'HOSPITAL') {
+        return MOCK_EMERGENCY_CONTACTS.filter(
+          (e) => e.category === 'AMBULANCE' || e.name.toLowerCase().includes('medical') || e.name.toLowerCase().includes('hospital')
+        );
+      }
       return MOCK_EMERGENCY_CONTACTS.filter(
         (e) => e.category.toLowerCase() === category.toLowerCase()
       );

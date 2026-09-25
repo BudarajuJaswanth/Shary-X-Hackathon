@@ -1,5 +1,6 @@
 import type { ICityServiceProvider } from './ICityServiceProvider';
 import type { CivicComplaint, MobilityRoute, EmergencyContact, TicketStatus } from '../../types/civic';
+import type { RequestStatusHistory } from '../../domain/models';
 
 export class SharyXCityServiceProvider implements ICityServiceProvider {
   public name = 'SharyX Civic Engine API';
@@ -52,11 +53,18 @@ export class SharyXCityServiceProvider implements ICityServiceProvider {
     return this.fallbackProvider.getComplaintByTicketId(ticketId);
   }
 
-  public async getAllComplaints(): Promise<CivicComplaint[]> {
+  public async getAllComplaints(filterStatus?: string): Promise<CivicComplaint[]> {
     if (!this.isConfigured) {
-      return this.fallbackProvider.getAllComplaints();
+      return this.fallbackProvider.getAllComplaints(filterStatus);
     }
-    return this.fallbackProvider.getAllComplaints();
+    return this.fallbackProvider.getAllComplaints(filterStatus);
+  }
+
+  public async getRequestStatusHistory(ticketId: string): Promise<RequestStatusHistory[]> {
+    if (!this.isConfigured) {
+      return this.fallbackProvider.getRequestStatusHistory(ticketId);
+    }
+    return this.fallbackProvider.getRequestStatusHistory(ticketId);
   }
 
   public async updateComplaintStatus(

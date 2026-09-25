@@ -9,12 +9,18 @@ export type SupportedIntentName =
   | 'WATER_LEAKAGE_COMPLAINT'
   | 'ROAD_DAMAGE_COMPLAINT'
   | 'MOBILITY_ROUTE'
+  | 'MOBILITY_NEARBY_STOP'
   | 'MOBILITY_BUS_STATUS'
+  | 'MOBILITY_ETA'
   | 'MOBILITY_STOP_SEARCH'
   | 'EMERGENCY_HOSPITAL'
   | 'EMERGENCY_POLICE'
   | 'EMERGENCY_FIRE'
   | 'TRACK_REQUEST'
+  | 'LIST_REQUESTS'
+  | 'REQUEST_DETAILS'
+  | 'OPEN_REQUESTS'
+  | 'RESOLVED_REQUESTS'
   | 'GENERAL_CITY_INFORMATION'
   | 'AFFIRMATIVE_CONFIRM'
   | 'NEGATIVE_CANCEL'
@@ -25,11 +31,23 @@ export interface ExtractedEntities {
   landmark?: string;
   destination?: string;
   source?: string;
+  origin?: string;
   complaintType?: string;
   description?: string;
   urgency?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   requestId?: string;
   routeNumber?: string;
+  selectedRouteIndex?: number;
+  ordinalReference?: string;
+  routeIndex?: number;
+  lastMobilityRoutes?: any;
+  facilityType?: EmergencyFacilityType;
+  lastEmergencyFacilities?: EmergencyFacility[];
+  selectedFacility?: EmergencyFacility;
+  filterStatus?: string;
+  searchQuery?: string;
+  candidateComplaints?: any[];
+  selectedComplaint?: any;
 }
 
 export interface IntentObject {
@@ -47,7 +65,12 @@ export interface ConversationContext {
   sessionId: string;
   citizenId?: string;
   activeLanguage: 'en-IN' | 'ta-IN' | 'te-IN';
+  currentIntent?: SupportedIntentName;
+  currentWorkflow?: string;
+  selectedTool?: string;
   pendingIntent?: IntentObject;
+  pendingConfirmation?: IntentObject & { idempotencyToken?: string };
+  lastToolResult?: any;
   accumulatedEntities: ExtractedEntities;
   turns: ConversationTurn[];
   lastUpdated: string;
@@ -124,12 +147,90 @@ export interface Complaint {
   audioNoteUrl?: string;
 }
 
+export interface TransitStop {
+  id: string;
+  name: string;
+  cityArea: string;
+  latitude?: number;
+  longitude?: number;
+  distanceKm?: number;
+  walkingMinutes?: number;
+}
+
+export interface TransitVehicle {
+  id: string;
+  vehicleNumber: string;
+  busType: 'AC Volvo' | 'Electric Express' | 'Ordinary Bus' | 'Metro Feeder' | 'Express Bus';
+  currentStop?: string;
+  status: 'ON_TIME' | 'DELAYED' | 'APPROACHING';
+}
+
+export interface ETA {
+  minutes: number;
+  estimatedArrival: string;
+  trafficCondition: 'LIGHT' | 'MODERATE' | 'HEAVY';
+}
+
+export interface TransitOption {
+  id: string;
+  routeNumber: string;
+  title: string;
+  origin: string;
+  destination: string;
+  durationMinutes: number;
+  stopsCount: number;
+  walkingDistanceMinutes: number;
+  fare: string;
+  busType: 'AC Volvo' | 'Electric Express' | 'Ordinary Bus' | 'Metro Feeder' | 'Express Bus';
+  nextDeparture: string;
+  eta: ETA;
+  stops: string[];
+  vehicle?: TransitVehicle;
+  isRecommended?: boolean;
+  isDemoData?: boolean;
+}
+
+export interface Route {
+  id: string;
+  routeName: string;
+  origin: string;
+  destination: string;
+  options: TransitOption[];
+}
+
 export interface MobilityRequest {
   id: string;
   origin?: string;
-  destination: string;
+  destination?: string;
   busRouteNumber?: string;
   requestedAt: string;
+  isMockDemoData?: boolean;
+}
+
+export type EmergencyFacilityType = 'HOSPITAL' | 'POLICE' | 'FIRE_STATION';
+
+export interface EmergencyFacility {
+  id: string;
+  name: string;
+  type: EmergencyFacilityType;
+  address: string;
+  cityArea: string;
+  latitude: number;
+  longitude: number;
+  distanceKm: number;
+  phone: string;
+  available24x7: boolean;
+  services: string[];
+  isDemoData: boolean;
+}
+
+export interface RequestStatusHistory {
+  id: string;
+  requestId: string;
+  status: 'SUBMITTED' | 'REGISTERED' | 'ASSIGNED' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'REJECTED';
+  timestamp: string;
+  note?: string;
+  updatedByDepartment?: string;
 }
 
 export interface EmergencyRequest {

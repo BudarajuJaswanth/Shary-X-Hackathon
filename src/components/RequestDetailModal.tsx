@@ -78,17 +78,17 @@ export const RequestDetailModal: React.FC<RequestDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Timeline Audit Log */}
+          {/* Visual Status Timeline */}
           <div className="timeline-section">
-            <h4 className="section-subtitle">Workflow Execution & Status Audit Log</h4>
+            <h4 className="section-subtitle">Request Status Timeline & Audit Log</h4>
             <div className="timeline-grid">
               <div className={`timeline-node ${step >= 1 ? 'completed' : ''}`}>
                 <div className="node-icon">
                   <CheckCircle2 size={16} />
                 </div>
                 <div className="node-content">
-                  <h5>1. Submitted (Registered)</h5>
-                  <p>Citizen logged report via CityVoice AI.</p>
+                  <h5>1. Submitted</h5>
+                  <p>Request registered in municipal portal via CityVoice AI.</p>
                   <small>{new Date(complaint.createdAt).toLocaleString()}</small>
                 </div>
               </div>
@@ -98,9 +98,9 @@ export const RequestDetailModal: React.FC<RequestDetailModalProps> = ({
                   <Building size={16} />
                 </div>
                 <div className="node-content">
-                  <h5>2. Assigned to Department</h5>
+                  <h5>2. Assigned</h5>
                   <p>{complaint.assignedDepartment}</p>
-                  <small>{step >= 2 ? new Date(complaint.updatedAt).toLocaleString() : 'Pending dispatch'}</small>
+                  <small>{step >= 2 ? new Date(complaint.updatedAt).toLocaleString() : 'Awaiting assignment'}</small>
                 </div>
               </div>
 
@@ -109,9 +109,9 @@ export const RequestDetailModal: React.FC<RequestDetailModalProps> = ({
                   <Clock size={16} />
                 </div>
                 <div className="node-content">
-                  <h5>3. In Progress (Field Team Dispatched)</h5>
-                  <p>Engineers & maintenance crew deployed on site.</p>
-                  <small>{step >= 3 ? 'Work in progress' : 'Awaiting team'}</small>
+                  <h5>3. In Progress</h5>
+                  <p>Field maintenance team dispatched on site.</p>
+                  <small>{step >= 3 ? `Updated ${new Date(complaint.updatedAt).toLocaleDateString()}` : 'Awaiting field crew'}</small>
                 </div>
               </div>
 
@@ -120,9 +120,9 @@ export const RequestDetailModal: React.FC<RequestDetailModalProps> = ({
                   <ShieldCheck size={16} />
                 </div>
                 <div className="node-content">
-                  <h5>4. Resolved</h5>
-                  <p>Hazard repaired & verified by municipal inspector.</p>
-                  <small>{step >= 4 ? 'Completed' : 'Pending resolution'}</small>
+                  <h5>4. Resolved / Closed</h5>
+                  <p>Issue repaired & verified by municipal inspector.</p>
+                  <small>{step >= 4 ? `Completed ${new Date(complaint.updatedAt).toLocaleDateString()}` : 'Pending resolution'}</small>
                 </div>
               </div>
             </div>
