@@ -1,10 +1,9 @@
-﻿{
+{
   "version": 2,
   "name": "cityvoice-ai",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "installCommand": "npm install",
-  "framework": null,
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
@@ -25,10 +24,5 @@
         { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
       ]
     }
-  ],
-  "env": {
-    "VITE_VOICE_PROVIDER": "webspeech",
-    "VITE_CITY_PROVIDER": "supabase",
-    "VITE_DEFAULT_LANG": "en-IN"
-  }
+  ]
 }
